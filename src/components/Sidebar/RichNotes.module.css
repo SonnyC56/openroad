@@ -1,0 +1,307 @@
+.richNotes {
+  margin-top: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.headerLeft svg {
+  color: var(--primary-500);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.editButton {
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editButton:hover {
+  background: var(--primary-100);
+  color: var(--primary-600);
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.previewButton,
+.saveButton,
+.cancelButton {
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewButton:hover {
+  background: var(--info-100);
+  color: var(--info-600);
+}
+
+.previewButton.active {
+  background: var(--info-500);
+  color: white;
+}
+
+.saveButton:hover {
+  background: var(--success-100);
+  color: var(--success-600);
+}
+
+.cancelButton:hover {
+  background: var(--error-100);
+  color: var(--error-600);
+}
+
+.editorContainer {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.toolbarButton {
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbarButton:hover {
+  background: var(--primary-100);
+  color: var(--primary-600);
+}
+
+.editor {
+  width: 100%;
+  min-height: 120px;
+  padding: 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+.editor::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.preview {
+  padding: 1rem;
+  min-height: 120px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.preview p {
+  margin: 0 0 0.75rem 0;
+}
+
+.preview p:last-child {
+  margin-bottom: 0;
+}
+
+.preview strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preview em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.preview a {
+  color: var(--primary-500);
+  text-decoration: underline;
+}
+
+.preview a:hover {
+  color: var(--primary-600);
+}
+
+.preview ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.preview li {
+  margin: 0.25rem 0;
+  list-style: none;
+  position: relative;
+}
+
+.preview li::before {
+  content: '•';
+  color: var(--primary-500);
+  position: absolute;
+  left: -1rem;
+}
+
+.notesPreview {
+  padding: 1rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.notesPreview p {
+  margin: 0 0 0.75rem 0;
+}
+
+.notesPreview p:last-child {
+  margin-bottom: 0;
+}
+
+.notesPreview strong {
+  font-weight: 600;
+}
+
+.notesPreview em {
+  font-style: italic;
+}
+
+.notesPreview a {
+  color: var(--primary-500);
+  text-decoration: underline;
+}
+
+.notesPreview ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.notesPreview li {
+  margin: 0.25rem 0;
+  list-style: none;
+  position: relative;
+}
+
+.notesPreview li::before {
+  content: '•';
+  color: var(--primary-500);
+  position: absolute;
+  left: -1rem;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  background: var(--glass-bg);
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.emptyState:hover {
+  border-color: var(--primary-500);
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.emptyState svg {
+  color: var(--primary-500);
+  opacity: 0.7;
+}
+
+.emptyState p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.emptyPreview {
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .toolbar {
+    padding: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .editor {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .preview {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .notesPreview {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .emptyState {
+    padding: 1.5rem;
+  }
+}

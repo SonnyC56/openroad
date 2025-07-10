@@ -1,0 +1,425 @@
+.poiRecommendations {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerLeft svg {
+  color: var(--primary-500);
+  flex-shrink: 0;
+}
+
+.headerLeft h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.headerLeft p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.refreshButton {
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refreshButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.refreshButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.routeInfo {
+  padding: 12px 24px;
+  background: rgba(102, 126, 234, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  color: var(--primary-700);
+  font-weight: 500;
+}
+
+.typeFilter {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.typeButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.typeButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.typeButton.active {
+  background: var(--primary-500);
+  color: white;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 24px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  color: var(--error-600);
+  font-size: 14px;
+}
+
+.error svg {
+  color: var(--error-500);
+  flex-shrink: 0;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px;
+  padding: 20px;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--primary-200);
+  border-top: 2px solid var(--primary-500);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.recommendations {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.recommendation {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.recommendation:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.recHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.recTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recTitle svg {
+  color: var(--primary-500);
+  flex-shrink: 0;
+}
+
+.recTitle h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.verified {
+  background: var(--success-500);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.recMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rating svg {
+  color: var(--warning-500);
+}
+
+.distance {
+  font-weight: 500;
+}
+
+.description {
+  margin: 8px 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.details {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.detail svg {
+  flex-shrink: 0;
+}
+
+.reason {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.reason strong {
+  color: var(--primary-600);
+}
+
+.searchResults {
+  margin: 8px 0;
+}
+
+.searchResults h5 {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.searchLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  color: var(--primary-600);
+  text-decoration: none;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.searchLink:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--primary-700);
+}
+
+.searchLink svg {
+  flex-shrink: 0;
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-500);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.addButton:hover {
+  background: var(--primary-600);
+  transform: translateY(-1px);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 40px 24px;
+}
+
+.empty svg {
+  color: var(--primary-500);
+  opacity: 0.7;
+  margin-bottom: 16px;
+}
+
+.empty p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+.retryButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-500);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background: var(--primary-600);
+  transform: translateY(-1px);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scrollbar styling */
+.recommendations::-webkit-scrollbar,
+.typeFilter::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.recommendations::-webkit-scrollbar-track,
+.typeFilter::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.recommendations::-webkit-scrollbar-thumb,
+.typeFilter::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.recommendations::-webkit-scrollbar-thumb:hover,
+.typeFilter::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .header {
+    padding: 16px 20px;
+  }
+  
+  .typeFilter {
+    padding: 12px 20px;
+  }
+  
+  .recommendations {
+    padding: 12px 20px;
+  }
+  
+  .recommendation {
+    padding: 12px;
+  }
+  
+  .recHeader {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .details {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
