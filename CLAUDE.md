@@ -142,6 +142,7 @@ src/
 - **Responsive Design**: Mobile/desktop layouts tested
 - **Animation Testing**: Framer Motion animations verified
 - **Glassmorphism UI**: All glass effects and blur working correctly
+- Write a Puppeteer test to test any new functionality and test it before calling it done
 
 ## Test Commands
 ```bash
@@ -160,3 +161,4 @@ npm run test:ui
 - Route-specific conversations
 - POI recommendations
 - Search integration
+```
