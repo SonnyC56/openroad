@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, Minimize2, Maximize2, X, MapPin, Loader2, Key } from 'lucide-react'
+import { Send, Sparkles, Minimize2, Maximize2, X, MapPin, Loader2, Key, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { useTrip } from '../../contexts/TripContext'
 import { searchSuggestions } from '../../services/geocoding'
 import { calculateRoute } from '../../services/routing'
-import { generateTripResponse, extractLocationSuggestions, isGeminiAvailable, initializeGemini } from '../../services/gemini'
+import { generateTripResponse, extractLocationSuggestions, isGeminiAvailable, initializeGemini, clearApiKey } from '../../services/gemini'
 import styles from './AIOverlay.module.css'
 
 const AIOverlay = () => {
   const { state, setCurrentTrip } = useTrip()
   const [isExpanded, setIsExpanded] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [showApiKeyInput, setShowApiKeyInput] = useState(!isGeminiAvailable())
   const [apiKey, setApiKey] = useState('')
   const [messages, setMessages] = useState([
@@ -456,7 +457,7 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
       setMessages(prev => [...prev, {
         id: Date.now(),
         type: 'ai',
-        content: "Great! Your API key has been set up successfully. I'm now powered by Google Gemini and ready to help you discover amazing places for your trip. Try asking me something like 'Find great restaurants in San Francisco' or 'Suggest scenic stops between Seattle and Portland'!",
+        content: "Perfect! Your API key has been saved and I'm ready to help you plan amazing trips. Try asking me something like 'Find great restaurants in San Francisco' or 'Suggest scenic stops between Seattle and Portland'!",
         timestamp: new Date()
       }])
       setApiKey('')
@@ -468,6 +469,17 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
         timestamp: new Date()
       }])
     }
+  }
+
+  const handleClearApiKey = () => {
+    clearApiKey()
+    setShowApiKeyInput(true)
+    setMessages([{
+      id: Date.now(),
+      type: 'ai',
+      content: "API key cleared. Enter a new Gemini API key to continue using AI features.",
+      timestamp: new Date()
+    }])
   }
 
   if (isMinimized) {
@@ -497,7 +509,7 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
           <h3>AI Travel Assistant</h3>
         </div>
         <div className={styles.headerActions}>
-          {!isGeminiAvailable() && (
+          {!isGeminiAvailable() ? (
             <button 
               onClick={() => setShowApiKeyInput(!showApiKeyInput)}
               className={styles.actionBtn}
@@ -505,7 +517,22 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
             >
               <Key size={16} />
             </button>
+          ) : (
+            <button 
+              onClick={handleClearApiKey}
+              className={styles.actionBtn}
+              title="Clear API Key"
+            >
+              <Trash2 size={16} />
+            </button>
           )}
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={styles.actionBtn}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {isCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
           <button 
             onClick={() => setIsExpanded(!isExpanded)}
             className={styles.actionBtn}
@@ -523,10 +550,18 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
         </div>
       </div>
 
-      <div className={styles.messagesContainer}>
-        <div className={styles.messages}>
-          <AnimatePresence>
-            {messages.map((message) => (
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={styles.collapsibleContent}
+          >
+            <div className={styles.messagesContainer}>
+              <div className={styles.messages}>
+                <AnimatePresence>
+                  {messages.map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -669,6 +704,9 @@ As a helpful travel assistant, provide a concise response (2-3 sentences max) wi
           </div>
         )}
       </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

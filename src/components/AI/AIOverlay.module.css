@@ -79,6 +79,10 @@
   gap: 0.25rem;
 }
 
+.collapsibleContent {
+  overflow: hidden;
+}
+
 .actionBtn {
   width: 28px;
   height: 28px;

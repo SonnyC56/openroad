@@ -343,15 +343,6 @@ const Map = () => {
         </div>
       </motion.div>
 
-      <motion.div 
-        className={styles.mapInstructions}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 3 }}
-      >
-        <MapPin size={16} />
-        <span>Click anywhere on the map to add waypoints</span>
-      </motion.div>
     </motion.div>
   )
 }

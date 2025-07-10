@@ -4,9 +4,47 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 let genAI = null
 let model = null
 
-// Initialize with API key (either from environment or user input)
+// Local storage key for API key
+const API_KEY_STORAGE_KEY = 'openroad-gemini-api-key'
+
+// Save API key to localStorage
+export const saveApiKey = (apiKey) => {
+  try {
+    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey)
+    return true
+  } catch (error) {
+    console.error('Failed to save API key:', error)
+    return false
+  }
+}
+
+// Get API key from localStorage
+export const getSavedApiKey = () => {
+  try {
+    return localStorage.getItem(API_KEY_STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to retrieve API key:', error)
+    return null
+  }
+}
+
+// Clear API key from localStorage
+export const clearApiKey = () => {
+  try {
+    localStorage.removeItem(API_KEY_STORAGE_KEY)
+    // Also clear the current instance
+    genAI = null
+    model = null
+    return true
+  } catch (error) {
+    console.error('Failed to clear API key:', error)
+    return false
+  }
+}
+
+// Initialize with API key (priority: provided > localStorage > environment)
 export const initializeGemini = (apiKey = null) => {
-  const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY
+  const key = apiKey || getSavedApiKey() || import.meta.env.VITE_GEMINI_API_KEY
   
   if (!key) {
     console.warn('No Gemini API key provided')
@@ -16,6 +54,12 @@ export const initializeGemini = (apiKey = null) => {
   try {
     genAI = new GoogleGenerativeAI(key)
     model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    
+    // Save the API key to localStorage if it was provided directly
+    if (apiKey) {
+      saveApiKey(apiKey)
+    }
+    
     return true
   } catch (error) {
     console.error('Failed to initialize Gemini:', error)
@@ -115,7 +159,10 @@ export const extractLocationSuggestions = (aiResponse) => {
   return unique.slice(0, 3) // Return max 3 suggestions
 }
 
-// Initialize Gemini on module load if API key is available
-if (import.meta.env.VITE_GEMINI_API_KEY) {
+// Initialize Gemini on module load if API key is available (check localStorage first)
+const savedKey = getSavedApiKey()
+const envKey = import.meta.env.VITE_GEMINI_API_KEY
+
+if (savedKey || envKey) {
   initializeGemini()
 }
