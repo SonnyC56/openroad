@@ -71,22 +71,7 @@ const Map = () => {
       maxZoom: 19
     }).addTo(mapInstanceRef.current)
 
-    // Add click handler with better UX
-    mapInstanceRef.current.on('click', (e) => {
-      console.log('Map clicked at:', e.latlng)
-      
-      // Create beautiful custom marker
-      const customIcon = L.divIcon({
-        className: styles.customMarker,
-        html: `<div class="${styles.markerIcon}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30]
-      })
-
-      L.marker([e.latlng.lat, e.latlng.lng], { icon: customIcon })
-        .addTo(mapInstanceRef.current)
-        .bindPopup(`<div class="${styles.popupContent}"><strong>Waypoint Added</strong><br/>Lat: ${e.latlng.lat.toFixed(4)}<br/>Lng: ${e.latlng.lng.toFixed(4)}</div>`)
-    })
+    // Map click functionality removed - use the trip planner or AI assistant to add waypoints
 
     // Cleanup function
     return () => {

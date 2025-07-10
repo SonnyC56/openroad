@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Sparkles, Minimize2, Maximize2, X, MapPin, Loader2, Key } from 'lucide-react'
 import { useTrip } from '../../contexts/TripContext'
 import { searchSuggestions } from '../../services/geocoding'
+import { calculateRoute } from '../../services/routing'
 import { generateTripResponse, extractLocationSuggestions, isGeminiAvailable, initializeGemini } from '../../services/gemini'
 import styles from './AIOverlay.module.css'
 
@@ -17,8 +18,8 @@ const AIOverlay = () => {
       id: 1,
       type: 'ai',
       content: isGeminiAvailable() 
-        ? "Hi! I'm your AI travel agent powered by Google Gemini. I can directly modify your trip for you!\n\n**What I can do:**\n• Add locations to your route\n• Remove waypoints: 'Remove Seattle'\n• Add notes: 'Add note great coffee to Portland'\n• Clear trip: 'Start over'\n• Suggest restaurants, attractions, and scenic stops\n\nTry asking me 'Find great restaurants in San Francisco' or 'Remove the last stop and add a scenic viewpoint instead'."
-        : "Hi! I'm your AI travel assistant. To use AI features, please enter your Google Gemini API key. You can get a free API key at https://ai.google.dev/. Once set up, I can intelligently manage your entire trip!",
+        ? "Hi! I'm your AI travel assistant 🗺️\n\nI can help you discover amazing places and manage your trip. When I suggest locations, you'll see clickable buttons to add the ones you like!\n\n**Try asking:**\n• \"Find 3 great parks in San Francisco\"\n• \"Remove Seattle from my trip\"\n• \"Add note bring camera to Golden Gate\"\n• \"Suggest scenic stops between LA and Vegas\"\n\nWhat would you like to explore?"
+        : "Hi! I'm your AI travel assistant. To use AI features, please enter your Google Gemini API key. You can get a free API key at https://ai.google.dev/. Once set up, I can help you discover amazing places!",
       timestamp: new Date()
     }
   ])
@@ -39,7 +40,7 @@ const AIOverlay = () => {
   }, [messages])
 
   // AI Agent Functions for Trip Manipulation
-  const addWaypointToTrip = (locationData) => {
+  const addWaypointToTrip = (locationData, autoCalculateRoute = false) => {
     if (!currentTrip || !locationData) return
 
     const newWaypoint = {
@@ -64,6 +65,16 @@ const AIOverlay = () => {
       duration: null
     }
     setCurrentTrip(updatedTrip)
+    
+    // Auto-recalculate route if requested and we have valid waypoints
+    if (autoCalculateRoute && locationData.lat && locationData.lng) {
+      setTimeout(() => {
+        const validWaypoints = newWaypoints.filter(wp => wp.lat && wp.lng)
+        if (validWaypoints.length >= 2) {
+          triggerRouteCalculation()
+        }
+      }, 500)
+    }
     
     return newWaypoint.id
   }
@@ -138,6 +149,66 @@ const AIOverlay = () => {
     return true
   }
 
+  const triggerRouteCalculation = async () => {
+    try {
+      // Get current waypoints after the addition
+      const currentWaypoints = currentTrip?.waypoints || []
+      const validWaypoints = currentWaypoints.filter(wp => wp.lat && wp.lng)
+      
+      if (validWaypoints.length >= 2) {
+        const routeData = await calculateRoute(validWaypoints)
+        
+        if (routeData) {
+          setCurrentTrip({
+            ...currentTrip,
+            route: routeData,
+            distance: routeData.distance,
+            duration: routeData.duration
+          })
+          
+          // Add a route calculation success message
+          const routeMessage = {
+            id: Date.now() + 1,
+            type: 'ai',
+            content: `Route updated! Your trip is now ${Math.round(routeData.distance / 1000)} km and takes about ${Math.round(routeData.duration / 60)} minutes.`,
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, routeMessage])
+        }
+      }
+    } catch (error) {
+      console.error('Route calculation error:', error)
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: "I had trouble calculating the route, but your waypoint has been added successfully!",
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    }
+  }
+
+  const handleAddSuggestion = (suggestion) => {
+    const waypointId = addWaypointToTrip({
+      name: suggestion.name,
+      lat: suggestion.lat,
+      lng: suggestion.lng,
+      address: suggestion.address
+    }, true) // Enable auto route calculation
+    
+    if (waypointId) {
+      // Add a confirmation message
+      const confirmationMessage = {
+        id: Date.now(),
+        type: 'ai',
+        content: `Perfect! I've added "${suggestion.name}" to your trip. Calculating the new route...`,
+        timestamp: new Date(),
+        addedWaypoints: [suggestion.name]
+      }
+      setMessages(prev => [...prev, confirmationMessage])
+    }
+  }
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
 
@@ -203,27 +274,18 @@ const AIOverlay = () => {
       const enhancedPrompt = `${userInput}
 
 Current trip context:
-- Total waypoints: ${tripContext.totalWaypoints}
-- Filled waypoints: ${tripContext.completedWaypoints}
 - Waypoints: ${waypoints.map(wp => `${wp.type}: ${wp.location || 'empty'}`).join(', ')}
 
-As an AI travel agent, I can:
-1. Add locations to the trip
-2. Remove locations from the trip  
-3. Update waypoint details (notes, times)
-4. Reorder waypoints
-5. Suggest routes and attractions
-
-Please provide helpful travel advice and if suggesting locations, I'll automatically add the best ones to the trip.`
+As a helpful travel assistant, provide a concise response (2-3 sentences max) with specific recommendations. If suggesting multiple locations, limit to 3-5 options and be conversational.`
       
       const aiResponse = await generateTripResponse(enhancedPrompt, tripContext)
       
-      // Extract location suggestions from the AI response
+      // Extract location suggestions from the AI response for interactive selection
       const suggestions = extractLocationSuggestions(aiResponse)
-      const addedWaypoints = []
+      const interactiveSuggestions = []
       
-      // Try to add suggested locations to the trip
-      for (const suggestion of suggestions) {
+      // Prepare suggestions for user selection (don't auto-add)
+      for (const suggestion of suggestions.slice(0, 5)) { // Limit to 5 suggestions
         try {
           const searchQuery = suggestion.location 
             ? `${suggestion.name} ${suggestion.location}`
@@ -233,32 +295,26 @@ Please provide helpful travel advice and if suggesting locations, I'll automatic
           
           if (geoResults.length > 0) {
             const place = geoResults[0]
-            const waypointId = addWaypointToTrip({
-              name: place.display_name.split(',')[0], // Use shorter name
+            interactiveSuggestions.push({
+              name: place.display_name.split(',')[0],
+              fullName: place.display_name,
               lat: parseFloat(place.lat),
               lng: parseFloat(place.lng || place.lon),
-              address: place.display_name
+              address: place.display_name,
+              description: suggestion.description || ''
             })
-            
-            if (waypointId) {
-              addedWaypoints.push(place.display_name.split(',')[0])
-            }
           }
         } catch (error) {
-          console.error('Error adding waypoint:', error)
+          console.error('Error geocoding suggestion:', error)
         }
       }
       
-      // Combine all performed actions
+      // Keep response concise and friendly
       let finalContent = aiResponse
       const allActions = [...actionsPerformed]
       
-      if (addedWaypoints.length > 0) {
-        allActions.push(`Added ${addedWaypoints.length} location${addedWaypoints.length > 1 ? 's' : ''} to your route`)
-      }
-      
       if (allActions.length > 0) {
-        finalContent += `\n\n✅ **Actions performed:**\n${allActions.map(action => `• ${action}`).join('\n')}`
+        finalContent += `\n\n✅ ${allActions.join(', ')}`
       }
       
       return {
@@ -266,8 +322,9 @@ Please provide helpful travel advice and if suggesting locations, I'll automatic
         type: 'ai',
         content: finalContent,
         timestamp: new Date(),
-        addedWaypoints,
-        actions: allActions
+        addedWaypoints: [],
+        actions: allActions,
+        suggestions: interactiveSuggestions // New: suggestions for user to choose from
       }
       
     } catch (error) {
@@ -484,6 +541,32 @@ Please provide helpful travel advice and if suggesting locations, I'll automatic
                       <span>Added to route</span>
                     </div>
                   )}
+                  {message.suggestions && message.suggestions.length > 0 && (
+                    <div className={styles.suggestionsSection}>
+                      <div className={styles.suggestionsHeader}>
+                        <span>Would you like to add any of these?</span>
+                      </div>
+                      <div className={styles.interactiveSuggestions}>
+                        {message.suggestions.map((suggestion, index) => (
+                          <motion.button
+                            key={index}
+                            className={styles.suggestionButton}
+                            onClick={() => handleAddSuggestion(suggestion)}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <MapPin size={14} />
+                            <div className={styles.suggestionInfo}>
+                              <span className={styles.suggestionName}>{suggestion.name}</span>
+                              {suggestion.description && (
+                                <span className={styles.suggestionDesc}>{suggestion.description}</span>
+                              )}
+                            </div>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -560,28 +643,28 @@ Please provide helpful travel advice and if suggesting locations, I'll automatic
         {isGeminiAvailable() && (
           <div className={styles.suggestions}>
             <button 
-              onClick={() => setInputValue("Find restaurants in San Francisco")}
+              onClick={() => setInputValue("Find 3 great restaurants in San Francisco")}
               className={styles.suggestionChip}
             >
               Find restaurants
             </button>
             <button 
-              onClick={() => setInputValue("Add scenic viewpoints between my stops")}
+              onClick={() => setInputValue("Show me scenic spots along my route")}
               className={styles.suggestionChip}
             >
-              Scenic views
+              Scenic spots
             </button>
             <button 
-              onClick={() => setInputValue("Remove the last waypoint")}
+              onClick={() => setInputValue("Suggest fun activities for families")}
               className={styles.suggestionChip}
             >
-              Remove stop
+              Family fun
             </button>
             <button 
-              onClick={() => setInputValue("Start over with a new trip")}
+              onClick={() => setInputValue("What are the best photo spots?")}
               className={styles.suggestionChip}
             >
-              Start over
+              Photo spots
             </button>
           </div>
         )}
