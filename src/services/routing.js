@@ -117,3 +117,68 @@ export const formatSpeed = (distanceMeters, durationSeconds) => {
   const kmh = (distanceMeters / 1000) / (durationSeconds / 3600)
   return `${Math.round(kmh)} km/h`
 }
+
+// Search for places along a route with maximum detour time
+export async function searchAlongRoute({ route, query, maxDetourMinutes = 10, limit = 20 }) {
+  if (!route || !query) return []
+  
+  try {
+    // Get points along the route from the geojson geometry
+    const routePoints = []
+    if (route.geometry && route.geometry.coordinates) {
+      const coords = route.geometry.coordinates
+      const interval = Math.max(50, Math.floor(coords.length / 100)) // Sample every 50 points or 100 samples max
+      
+      for (let i = 0; i < coords.length; i += interval) {
+        routePoints.push(coords[i])
+      }
+    }
+    
+    // Mock search results - in production, this would call a Places API
+    const mockResults = []
+    const categories = {
+      restaurant: ['McDonald\'s', 'Subway', 'Chipotle', 'Olive Garden', 'Denny\'s'],
+      'gas station': ['Shell', 'Chevron', 'BP', 'ExxonMobil', 'Texaco'],
+      hotel: ['Holiday Inn', 'Hampton Inn', 'Best Western', 'Motel 6', 'Marriott'],
+      coffee: ['Starbucks', 'Dunkin\'', 'Tim Hortons', 'Peet\'s Coffee', 'Dutch Bros'],
+      shopping: ['Target', 'Walmart', 'Mall', 'Outlet Store', 'Best Buy'],
+      attraction: ['Museum', 'Park', 'Monument', 'Viewpoint', 'Historic Site']
+    }
+    
+    // Find appropriate category
+    let selectedCategory = 'restaurant'
+    for (const [cat, keywords] of Object.entries(categories)) {
+      if (query.toLowerCase().includes(cat) || keywords.some(k => query.toLowerCase().includes(k.toLowerCase()))) {
+        selectedCategory = cat
+        break
+      }
+    }
+    
+    // Generate mock results along the route
+    const numResults = Math.min(limit, Math.floor(Math.random() * 10) + 5)
+    for (let i = 0; i < numResults; i++) {
+      const pointIndex = Math.floor(Math.random() * routePoints.length)
+      const point = routePoints[pointIndex]
+      const names = categories[selectedCategory]
+      const name = names[Math.floor(Math.random() * names.length)]
+      
+      mockResults.push({
+        name: `${name} - Location ${i + 1}`,
+        address: `${Math.floor(Math.random() * 9999) + 1} Highway ${Math.floor(Math.random() * 99) + 1}`,
+        lat: point[1] + (Math.random() - 0.5) * 0.01,
+        lng: point[0] + (Math.random() - 0.5) * 0.01,
+        rating: (Math.random() * 2 + 3).toFixed(1),
+        detourMinutes: Math.floor(Math.random() * maxDetourMinutes) + 1,
+        category: selectedCategory
+      })
+    }
+    
+    // Sort by detour time
+    mockResults.sort((a, b) => a.detourMinutes - b.detourMinutes)
+    
+    return mockResults
+  } catch (error) {
+    console.error('Search along route error:', error)
+    return []
+  }
+}

@@ -24,6 +24,82 @@ const AIOverlay = memo(() => {
   const [isThinking, setIsThinking] = useState(false)
   const [showClearHistory, setShowClearHistory] = useState(false)
   
+  // Helper function to format AI responses with better spacing
+  const formatAIResponse = (content) => {
+    if (!content) return ''
+    
+    // Convert markdown-style formatting
+    let formatted = content
+      // Bold text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Bullet points
+      .replace(/^[•·\-*]\s+(.+)$/gm, '<li>$1</li>')
+      // Numbered lists
+      .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+      // Headers
+      .replace(/^###\s+(.+)$/gm, '<h4>$1</h4>')
+      .replace(/^##\s+(.+)$/gm, '<h3>$1</h3>')
+      .replace(/^#\s+(.+)$/gm, '<h2>$1</h2>')
+      // Line breaks for better spacing
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br />')
+    
+    // Wrap in paragraphs
+    if (!formatted.startsWith('<')) {
+      formatted = `<p>${formatted}</p>`
+    }
+    
+    // Group consecutive <li> elements into <ul>
+    formatted = formatted.replace(/(<li>.*?<\/li>\s*)+/g, (match) => {
+      return `<ul>${match}</ul>`
+    })
+    
+    return formatted
+  }
+  
+  // Helper function to find best position for waypoint insertion
+  const findBestWaypointPosition = (newWaypoint, existingWaypoints) => {
+    const waypoints = existingWaypoints.filter(wp => wp.lat && wp.lng)
+    if (waypoints.length < 2) return 1
+    
+    // Calculate distances using Haversine formula
+    const getDistance = (lat1, lng1, lat2, lng2) => {
+      const R = 6371 // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180
+      const dLng = (lng2 - lng1) * Math.PI / 180
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      return R * c
+    }
+    
+    let bestPosition = 1
+    let minTotalDistance = Infinity
+    
+    // Check each possible position
+    for (let i = 1; i < waypoints.length; i++) {
+      const prevWp = waypoints[i - 1]
+      const nextWp = waypoints[i]
+      
+      // Calculate distances
+      const originalDist = getDistance(prevWp.lat, prevWp.lng, nextWp.lat, nextWp.lng)
+      const distToPOI = getDistance(prevWp.lat, prevWp.lng, newWaypoint.lat, newWaypoint.lng)
+      const distFromPOI = getDistance(newWaypoint.lat, newWaypoint.lng, nextWp.lat, nextWp.lng)
+      const newTotalDist = distToPOI + distFromPOI
+      
+      // Calculate how much extra distance this adds
+      const extraDistance = newTotalDist - originalDist
+      
+      if (extraDistance < minTotalDistance) {
+        minTotalDistance = extraDistance
+        bestPosition = i
+      }
+    }
+    
+    return bestPosition
+  }
+  
   // Function to download conversation history
   const downloadConversationHistory = () => {
     const conversationData = {
@@ -54,7 +130,26 @@ const AIOverlay = memo(() => {
       id: 1,
       type: 'ai',
       content: isGeminiAvailable() 
-        ? "Hi! I'm your AI travel agent 🗺️✨\n\nI'll automatically plan your trips, plot locations on the map, and add stops to your itinerary!\n\n**🎯 I can:**\n• Plan complete trip itineraries with automatic waypoint creation\n• Plot all suggestions directly on the map with animations\n• Add stops to your trip automatically as I suggest them\n• Provide expert travel timing and route optimization\n• Show real-time weather and traffic conditions\n• Give smart recommendations based on conditions\n\n**Try asking:**\n• \"Plan a 14-day trip from NY to LA visiting national parks\"\n• \"Show me scenic stops between Denver and Vegas\"\n• \"What's the weather like on my route?\"\n• \"Find the best time to leave to avoid traffic\"\n\nWhat adventure shall we plan together?"
+        ? `Hi! I'm your AI travel agent 🗺️✨
+
+I'll automatically plan your trips, plot locations on the map, and add stops to your itinerary!
+
+**🎯 I can:**
+• Plan complete trip itineraries with automatic waypoint creation
+• Plot all suggestions directly on the map with animations
+• Add stops to your trip automatically as I suggest them
+• Provide expert travel timing and route optimization
+• Show real-time weather and traffic conditions
+• Give smart recommendations based on conditions
+
+**Try asking:**
+• "Plan a 14-day trip from NY to LA visiting national parks"
+• "Show me scenic stops between Denver and Vegas"
+• "What's the weather like on my route?"
+• "Find the best time to leave to avoid traffic"
+• "Add a stop at [location]" - I'll insert it at the optimal point
+
+What adventure shall we plan together?`
         : "Hi! I'm your AI travel assistant. To use AI features, please enter your Google Gemini API key. You can get a free API key at https://ai.google.dev/. Once set up, I can help you discover amazing places!",
       timestamp: new Date()
     }
@@ -875,6 +970,13 @@ const AIOverlay = memo(() => {
                   notes: `AI suggested: ${result.suggestion.description || 'Great stop for your trip!'}`
                 }
                 
+                // For existing trips, find the best position to insert based on geographic proximity
+                if (hasExistingStart && hasExistingEnd && currentWaypointsNow.length >= 2) {
+                  const bestPosition = findBestWaypointPosition(waypoint, currentWaypointsNow)
+                  console.log(`🎯 Inserting ${locationName} at position ${bestPosition} for optimal route`)
+                  waypoint.insertAt = bestPosition
+                }
+                
                 addWaypoint(waypoint)
                 addedWaypoints.push(`STOP: ${locationName}`)
                 console.log(`✅ Added new ${waypointType}:`, locationName, `(${result.coords.lat.toFixed(2)}, ${result.coords.lng.toFixed(2)})`)
@@ -893,7 +995,11 @@ const AIOverlay = memo(() => {
               setMessages(prev => [...prev, {
                 id: Date.now() + 999,
                 type: 'ai',
-                content: `🎉 I've automatically added ${addedWaypoints.length} stops to your trip:\n\n${addedWaypoints.map(w => `📍 ${w}`).join('\n')}\n\nYou can see them plotted on the map and in your trip planner! Want me to suggest more stops or optimize the route?`,
+                content: `🎉 I've automatically added ${addedWaypoints.length} stops to your trip:
+
+${addedWaypoints.map(w => `📍 ${w}`).join('\n')}
+
+You can see them plotted on the map and in your trip planner! Want me to suggest more stops or optimize the route?`,
                 timestamp: new Date(),
                 isAutoConfirmation: true
               }])
@@ -1621,7 +1727,14 @@ ${isMultiStepTrip ? `- List destinations in the EXACT order they would be encoun
                 className={`${styles.message} ${styles[message.type]}`}
               >
                 <div className={styles.messageContent}>
-                  {message.content}
+                  {message.type === 'ai' ? (
+                    <div 
+                      className={styles.formattedContent}
+                      dangerouslySetInnerHTML={{ __html: formatAIResponse(message.content) }}
+                    />
+                  ) : (
+                    message.content
+                  )}
                   {message.addedWaypoints && message.addedWaypoints.length > 0 && (
                     <div className={styles.addedWaypoints}>
                       <span>📍</span>

@@ -49,6 +49,7 @@ import {
 import { useTrip } from '../../contexts/TripContext'
 import { LocationInput } from './LocationInput'
 import { RichNotes } from './RichNotes'
+import SearchAlongRoute from '../Map/SearchAlongRoute'
 import styles from './TripPlanner.module.css'
 
 // Sortable waypoint item component - memoized for performance
@@ -666,7 +667,7 @@ const TripPlanner = memo(() => {
               <Route size={16} />
               <span>~{Math.max(0, waypoints.filter(wp => wp.location).length - 1)} segments</span>
             </div>
-            {trip.route && (
+            {trip?.route && (
               <>
                 <div className={styles.stat}>
                   <Navigation size={16} />
@@ -684,6 +685,35 @@ const TripPlanner = memo(() => {
               {routeError}
             </div>
           )}
+        </motion.div>
+      )}
+      
+      {/* Search Along Route Feature */}
+      {trip?.route && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <SearchAlongRoute 
+            onResultSelect={(result, addToRoute) => {
+              if (addToRoute) {
+                // Add the search result as a waypoint
+                const newWaypoint = {
+                  id: `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  type: 'waypoint',
+                  location: result.name,
+                  lat: result.lat,
+                  lng: result.lng,
+                  date: '',
+                  time: '',
+                  notes: `Found along route: ${result.category}`,
+                  address: result.address
+                }
+                addWaypoint(newWaypoint)
+              }
+            }}
+          />
         </motion.div>
       )}
 

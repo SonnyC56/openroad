@@ -91,6 +91,8 @@ const POIOverlay = ({ map }) => {
     setIsCalculating(true)
     try {
       const waypoints = state.currentTrip.waypoints.filter(wp => wp.lat && wp.lng)
+      const originalRoute = state.currentTrip.route
+      const originalTotalTime = originalRoute ? originalRoute.legs.reduce((sum, leg) => sum + leg.duration, 0) : 0
       
       // Helper function to calculate distance between two points
       const getDistance = (lat1, lng1, lat2, lng2) => {
@@ -260,23 +262,18 @@ const POIOverlay = ({ map }) => {
 
       // Make marker more clickable
       marker.options.riseOnHover = true
-      
-      // Handle marker click - simplified
-      marker.on('click', (e) => {
-        // Stop propagation to prevent map clicks
-        L.DomEvent.stopPropagation(e)
-        
-        // Handle POI click for route calculation if needed
-        if (state.currentTrip && state.currentTrip.waypoints.length >= 2) {
-          setTimeout(() => handlePOIClick(poi), 100)
-        }
-      })
+      marker.options.autoPanOnFocus = true
 
       marker.on('popupopen', (e) => {
         popupRef.current = e.popup
         
-        // Add event handlers for action buttons
-        setTimeout(() => {
+        // Immediately trigger route calculation if we have a trip
+        if (state.currentTrip && state.currentTrip.waypoints.length >= 2 && poi) {
+          handlePOIClick(poi)
+        }
+        
+        // Add event handlers for action buttons immediately
+        requestAnimationFrame(() => {
           // Add to Route button
           const addToRouteBtn = document.getElementById(`add-to-route-${poi.id}`)
           if (addToRouteBtn) {
@@ -376,7 +373,7 @@ const POIOverlay = ({ map }) => {
                 confirmBtn.onclick = (event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  handleAddPOI()
+                  setTimeout(() => handleAddPOI(), 0)
                 }
               }
             } else if (!state.currentTrip) {
