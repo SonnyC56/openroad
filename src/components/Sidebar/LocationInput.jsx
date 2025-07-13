@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Search, X, Loader2 } from 'lucide-react'
 import { searchSuggestions } from '../../services/geocoding'
@@ -17,6 +18,7 @@ export const LocationInput = ({
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
   const inputRef = useRef(null)
   const dropdownRef = useRef(null)
   const timeoutRef = useRef(null)
@@ -28,12 +30,34 @@ export const LocationInput = ({
     }
   }, [value, inputValue])
 
+  // Calculate dropdown position when suggestions appear
+  useEffect(() => {
+    if (isOpen && suggestions.length > 0 && inputRef.current) {
+      const inputRect = inputRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: inputRect.bottom + 8, // Fixed positioning doesn't need scroll offset
+        left: inputRect.left,
+        width: inputRect.width
+      })
+    }
+  }, [isOpen, suggestions.length])
+
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false)
-        setSelectedIndex(-1)
+      // Check if the click is on the input or dropdown
+      if (inputRef.current && inputRef.current.contains(event.target)) {
+        return // Don't close if clicking on input
       }
+      
+      // Check if the click is on a suggestion button
+      const dropdown = document.querySelector(`.${styles.dropdown}`)
+      if (dropdown && dropdown.contains(event.target)) {
+        return // Don't close if clicking on dropdown
+      }
+      
+      // Close dropdown if clicking outside
+      setIsOpen(false)
+      setSelectedIndex(-1)
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -71,16 +95,18 @@ export const LocationInput = ({
   }
 
   const searchLocations = async (query) => {
+    console.log('🔍 Searching for:', query)
     setIsLoading(true)
     setSelectedIndex(-1)
     
     try {
       const results = await searchSuggestions(query)
+      console.log('📍 Search results:', results.length, 'locations found')
+      console.log('🔧 Input value:', inputValue.trim(), 'Query:', query.trim(), 'Match:', inputValue.trim() === query.trim())
       // Only update if the input value hasn't changed (avoid race conditions)
-      if (inputValue.trim() === query.trim()) {
-        setSuggestions(results.slice(0, 5)) // Limit to 5 suggestions
-        setIsOpen(results.length > 0)
-      }
+      setSuggestions(results.slice(0, 5)) // Limit to 5 suggestions
+      setIsOpen(results.length > 0)
+      console.log('✅ Dropdown should be open:', results.length > 0)
     } catch (error) {
       console.error('Search error:', error)
       setSuggestions([])
@@ -216,42 +242,40 @@ export const LocationInput = ({
         </div>
       </div>
 
-      <AnimatePresence>
-        {isOpen && suggestions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className={styles.dropdown}
-          >
-            {suggestions.map((suggestion, index) => (
-              <motion.button
-                key={suggestion.id || index}
-                type="button"
-                onClick={() => handleSuggestionClick(suggestion)}
-                className={`${styles.suggestionItem} ${
-                  index === selectedIndex ? styles.selected : ''
-                }`}
-                whileHover={{ backgroundColor: 'rgba(102, 126, 234, 0.1)' }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className={styles.suggestionIcon}>
-                  {getLocationIcon(suggestion.type)}
+      {isOpen && suggestions.length > 0 && createPortal(
+        <div
+          className={styles.dropdown}
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`
+          }}
+        >
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={suggestion.id || index}
+              type="button"
+              onClick={() => handleSuggestionClick(suggestion)}
+              className={`${styles.suggestionItem} ${
+                index === selectedIndex ? styles.selected : ''
+              }`}
+            >
+              <div className={styles.suggestionIcon}>
+                {getLocationIcon(suggestion.type)}
+              </div>
+              <div className={styles.suggestionContent}>
+                <div className={styles.suggestionTitle}>
+                  {suggestion.display_name.split(',')[0]}
                 </div>
-                <div className={styles.suggestionContent}>
-                  <div className={styles.suggestionTitle}>
-                    {suggestion.display_name.split(',')[0]}
-                  </div>
-                  <div className={styles.suggestionSubtitle}>
-                    {formatDisplayName(suggestion.display_name)}
-                  </div>
+                <div className={styles.suggestionSubtitle}>
+                  {formatDisplayName(suggestion.display_name)}
                 </div>
-              </motion.button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </div>
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

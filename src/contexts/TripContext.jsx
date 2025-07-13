@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect } from 'react'
+import { createContext, useContext, useReducer, useEffect, useMemo } from 'react'
 
 const TripContext = createContext()
 
@@ -7,7 +7,8 @@ const initialState = {
   trips: [],
   activeTab: 'planner',
   selectedWaypoints: [],
-  mapInstance: null
+  mapInstance: null,
+  selectedLeg: null // Track which leg of the journey is selected
 }
 
 // Local storage utilities
@@ -46,11 +47,39 @@ const tripReducer = (state, action) => {
     
     case 'ADD_WAYPOINT':
       if (!state.currentTrip) return state
+      
+      let newWaypoints
+      if (action.payload.insertAt !== undefined) {
+        // Insert at specific position
+        const insertIndex = action.payload.insertAt
+        const waypointData = { ...action.payload }
+        delete waypointData.insertAt
+        
+        newWaypoints = [
+          ...state.currentTrip.waypoints.slice(0, insertIndex),
+          waypointData,
+          ...state.currentTrip.waypoints.slice(insertIndex)
+        ]
+      } else {
+        // Add at end (before final end waypoint if it exists)
+        const hasEndWaypoint = state.currentTrip.waypoints.some(wp => wp.type === 'end')
+        if (hasEndWaypoint) {
+          const endIndex = state.currentTrip.waypoints.findIndex(wp => wp.type === 'end')
+          newWaypoints = [
+            ...state.currentTrip.waypoints.slice(0, endIndex),
+            action.payload,
+            ...state.currentTrip.waypoints.slice(endIndex)
+          ]
+        } else {
+          newWaypoints = [...state.currentTrip.waypoints, action.payload]
+        }
+      }
+      
       newState = {
         ...state,
         currentTrip: {
           ...state.currentTrip,
-          waypoints: [...state.currentTrip.waypoints, action.payload],
+          waypoints: newWaypoints,
           updated: new Date().toISOString()
         }
       }
@@ -121,6 +150,49 @@ const tripReducer = (state, action) => {
     case 'SET_MAP_INSTANCE':
       return { ...state, mapInstance: action.payload }
     
+    case 'NEW_TRIP':
+      const newTrip = {
+        id: `trip-${Date.now()}`,
+        name: action.payload?.name || 'Untitled Trip',
+        waypoints: [
+          {
+            id: 'start-' + Date.now(),
+            location: '',
+            type: 'start',
+            date: '',
+            time: '',
+            notes: '',
+            lat: null,
+            lng: null,
+            address: ''
+          },
+          {
+            id: 'end-' + Date.now() + 1,
+            location: '',
+            type: 'end', 
+            date: '',
+            time: '',
+            notes: '',
+            lat: null,
+            lng: null,
+            address: ''
+          }
+        ],
+        route: null,
+        distance: null,
+        duration: null,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+      }
+      
+      // Save to localStorage
+      saveToLocalStorage('openroad-current-trip', newTrip)
+      
+      return { ...state, currentTrip: newTrip, selectedLeg: null }
+    
+    case 'SET_SELECTED_LEG':
+      return { ...state, selectedLeg: action.payload }
+    
     default:
       return state
   }
@@ -145,7 +217,8 @@ export const TripProvider = ({ children }) => {
     }
   }, [])
 
-  const value = {
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     state,
     dispatch,
     // Helper functions
@@ -157,8 +230,10 @@ export const TripProvider = ({ children }) => {
     saveTrip: (trip) => dispatch({ type: 'SAVE_TRIP', payload: trip }),
     loadTrips: (trips) => dispatch({ type: 'LOAD_TRIPS', payload: trips }),
     deleteTrip: (id) => dispatch({ type: 'DELETE_TRIP', payload: id }),
-    setMapInstance: (map) => dispatch({ type: 'SET_MAP_INSTANCE', payload: map })
-  }
+    newTrip: (name) => dispatch({ type: 'NEW_TRIP', payload: { name } }),
+    setMapInstance: (map) => dispatch({ type: 'SET_MAP_INSTANCE', payload: map }),
+    setSelectedLeg: (legIndex) => dispatch({ type: 'SET_SELECTED_LEG', payload: legIndex })
+  }), [state, dispatch])
 
   return (
     <TripContext.Provider value={value}>

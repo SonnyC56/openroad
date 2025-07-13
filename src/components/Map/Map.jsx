@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo, useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import L from 'leaflet'
-import { 
-  Navigation, 
-  Maximize2, 
-  Minimize2, 
-  Layers, 
-  MapPin, 
-  Route,
-  Zap,
-  Eye,
-  EyeOff,
-  Settings
-} from 'lucide-react'
+// Import only specific icons to reduce bundle size
+import Navigation from 'lucide-react/dist/esm/icons/navigation'
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2'
+import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2'
+import Layers from 'lucide-react/dist/esm/icons/layers'
+import MapPin from 'lucide-react/dist/esm/icons/map-pin'
+import Route from 'lucide-react/dist/esm/icons/route'
+import Zap from 'lucide-react/dist/esm/icons/zap'
+import Eye from 'lucide-react/dist/esm/icons/eye'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
+import Settings from 'lucide-react/dist/esm/icons/settings'
+import Star from 'lucide-react/dist/esm/icons/star'
 import { useTrip } from '../../contexts/TripContext'
+import POIOverlay from './POIOverlay'
+import SearchOverlay from './SearchOverlay'
+import TrafficOverlay from '../Traffic/TrafficOverlay'
 import styles from './Map.module.css'
 
 // Fix for default markers in Leaflet
@@ -24,21 +27,39 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
 
-const Map = () => {
-  const { state } = useTrip()
+const Map = memo(() => {
+  const { state, setSelectedLeg } = useTrip()
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef({})
   const routeLineRef = useRef(null)
+  const routeSegmentsRef = useRef([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [currentTileLayer, setCurrentTileLayer] = useState('osm')
   const [showTraffic, setShowTraffic] = useState(false)
+  const [showPOIs, setShowPOIs] = useState(true)
   const [isLocating, setIsLocating] = useState(false)
   
   const trip = state.currentTrip
-  const waypoints = trip?.waypoints || []
+  const waypoints = useMemo(() => trip?.waypoints || [], [trip?.waypoints])
+  const selectedLeg = state.selectedLeg
 
-  const tileLayers = {
+  // Handle segment click for AI interaction - memoized to prevent unnecessary re-renders
+  const handleSegmentClick = useCallback((segmentInfo) => {
+    // Set the selected leg in context
+    setSelectedLeg(segmentInfo.legIndex)
+    
+    // Create a custom event to notify AI overlay about segment selection (without auto-message)
+    const segmentClickEvent = new CustomEvent('routeSegmentSelect', {
+      detail: {
+        segmentInfo
+      }
+    })
+    window.dispatchEvent(segmentClickEvent)
+  }, [setSelectedLeg])
+
+  // Memoize tile layers config to prevent recreation on every render
+  const tileLayers = useMemo(() => ({
     osm: {
       name: 'OpenStreetMap',
       url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -54,7 +75,7 @@ const Map = () => {
       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
       attribution: '© OpenTopoMap contributors'
     }
-  }
+  }), [])
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -62,7 +83,18 @@ const Map = () => {
     // Initialize map with better styling
     mapInstanceRef.current = L.map(mapRef.current, {
       zoomControl: false,
-      attributionControl: false
+      attributionControl: true,  // Re-enable attribution
+      // Ensure proper initial rendering
+      preferCanvas: true,
+      renderer: L.canvas(),
+      // Prevent any automatic adjustments
+      keyboard: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      tap: true,
+      tapTolerance: 15,
+      trackResize: false  // We'll handle resizing manually
     }).setView([39.8283, -98.5795], 4)
 
     // Add initial tile layer
@@ -71,10 +103,45 @@ const Map = () => {
       maxZoom: 19
     }).addTo(mapInstanceRef.current)
 
+    // Make map instance available globally for agentic AI
+    window.mapInstance = mapInstanceRef.current
+
+    // Ensure map is properly sized when ready
+    mapInstanceRef.current.whenReady(() => {
+      // Double invalidate to ensure proper sizing
+      mapInstanceRef.current.invalidateSize();
+      setTimeout(() => {
+        mapInstanceRef.current.invalidateSize();
+      }, 100);
+    });
+
     // Map click functionality removed - use the trip planner or AI assistant to add waypoints
+
+    // Handle container resize and ensure proper initial size
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (mapInstanceRef.current && entries[0]) {
+        // Only invalidate if the container has actual dimensions
+        const { width, height } = entries[0].contentRect;
+        if (width > 0 && height > 0) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }
+    });
+    
+    if (mapRef.current) {
+      resizeObserver.observe(mapRef.current);
+      
+      // Initial size check after a brief delay to ensure DOM is ready
+      requestAnimationFrame(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      });
+    }
 
     // Cleanup function
     return () => {
+      resizeObserver.disconnect();
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
@@ -98,17 +165,41 @@ const Map = () => {
         const markerColor = waypoint.type === 'start' ? '#10b981' : 
                            waypoint.type === 'end' ? '#ef4444' : '#6366f1'
         
+        // Create beautiful modern icon with gradients and glassmorphism
+        const markerGradient = waypoint.type === 'start' ? 'linear-gradient(135deg, #10b981, #059669, #047857)' : 
+                               waypoint.type === 'end' ? 'linear-gradient(135deg, #ef4444, #dc2626, #b91c1c)' : 
+                               'linear-gradient(135deg, #6366f1, #4f46e5, #4338ca)'
+        
+        const markerShadow = waypoint.type === 'start' ? 'rgba(16, 185, 129, 0.4)' : 
+                             waypoint.type === 'end' ? 'rgba(239, 68, 68, 0.4)' : 
+                             'rgba(99, 102, 241, 0.4)'
+        
         const customIcon = L.divIcon({
           className: styles.waypointMarker,
-          html: `<div class="${styles.markerIcon}" style="background: ${markerColor};">
-                   <span class="${styles.markerLabel}">
-                     ${waypoint.type === 'start' ? 'A' : 
-                       waypoint.type === 'end' ? String.fromCharCode(65 + waypoints.length - 1) : 
-                       String.fromCharCode(65 + index)}
-                   </span>
-                 </div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 32]
+          html: `
+            <div class="${styles.modernMarkerWrapper}">
+              <div class="${styles.modernMarkerIcon}" style="
+                background: ${markerGradient};
+                box-shadow: 0 8px 32px ${markerShadow}, 0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+              ">
+                <div class="${styles.markerInnerGlow}"></div>
+                <span class="${styles.modernMarkerLabel}">
+                  ${waypoint.type === 'start' ? 'A' : 
+                    waypoint.type === 'end' ? String.fromCharCode(65 + waypoints.length - 1) : 
+                    String.fromCharCode(65 + index)}
+                </span>
+                <div class="${styles.modernSparkleContainer}">
+                  <div class="${styles.modernSparkle}"></div>
+                  <div class="${styles.modernSparkle}"></div>
+                  <div class="${styles.modernSparkle}"></div>
+                  <div class="${styles.modernSparkle}"></div>
+                </div>
+              </div>
+              <div class="${styles.markerTail}" style="background: ${markerGradient};"></div>
+            </div>
+          `,
+          iconSize: [40, 50],
+          iconAnchor: [20, 50]
         })
 
         const marker = L.marker([waypoint.lat, waypoint.lng], { icon: customIcon })
@@ -137,24 +228,141 @@ const Map = () => {
   useEffect(() => {
     if (!mapInstanceRef.current) return
 
-    // Clear existing route line
+    // Clear existing route line and segments
     if (routeLineRef.current) {
       mapInstanceRef.current.removeLayer(routeLineRef.current)
       routeLineRef.current = null
     }
 
-    // Add new route line if route exists
-    if (trip?.route?.geometry) {
-      const routeCoordinates = trip.route.geometry.coordinates.map(coord => [coord[1], coord[0]])
+    // Clear any existing route segments
+    routeSegmentsRef.current.forEach(segment => {
+      mapInstanceRef.current.removeLayer(segment)
+    })
+    routeSegmentsRef.current = []
+
+    // Add new route with interactive segments
+    if (trip?.route?.geometry && trip?.route?.legs) {
+      const fullRouteCoordinates = trip.route.geometry.coordinates.map(coord => [coord[1], coord[0]])
       
-      routeLineRef.current = L.polyline(routeCoordinates, {
-        color: '#6366f1',
-        weight: 4,
-        opacity: 0.7,
+      // Create the full route line (lighter/background)
+      routeLineRef.current = L.polyline(fullRouteCoordinates, {
+        color: '#e5e7eb',
+        weight: 6,
+        opacity: 0.4,
         smoothFactor: 1
       }).addTo(mapInstanceRef.current)
+
+      // Create interactive segments for each leg
+      const validWaypoints = waypoints.filter(wp => wp.lat && wp.lng)
+      if (validWaypoints.length >= 2 && trip.route.legs) {
+        // Calculate cumulative distances to accurately split the route
+        let cumulativeDistance = 0
+        const legDistances = trip.route.legs.map(leg => {
+          const start = cumulativeDistance
+          cumulativeDistance += leg.distance || 0
+          return { start, end: cumulativeDistance }
+        })
+        const totalDistance = cumulativeDistance
+        
+        trip.route.legs.forEach((leg, legIndex) => {
+          if (legIndex < validWaypoints.length - 1) {
+            // Get waypoints for this leg
+            const startWaypoint = validWaypoints[legIndex]
+            const endWaypoint = validWaypoints[legIndex + 1]
+            
+            // Extract coordinates for this leg segment
+            const legCoordinates = []
+            
+            // Calculate which portion of the full route this leg represents
+            const legStartRatio = totalDistance > 0 ? legDistances[legIndex].start / totalDistance : 0
+            const legEndRatio = totalDistance > 0 ? legDistances[legIndex].end / totalDistance : 1
+            
+            // Find the segment of coordinates that corresponds to this leg
+            const totalCoords = fullRouteCoordinates.length
+            const segmentStart = Math.floor(legStartRatio * totalCoords)
+            const segmentEnd = Math.min(Math.floor(legEndRatio * totalCoords), totalCoords - 1)
+            
+            // Add coordinates for this leg (without duplicating start/end points)
+            for (let i = segmentStart; i <= segmentEnd; i++) {
+              legCoordinates.push(fullRouteCoordinates[i])
+            }
+            
+            // Ensure we have at least 2 points for a valid polyline
+            if (legCoordinates.length < 2) {
+              legCoordinates.push([startWaypoint.lat, startWaypoint.lng])
+              legCoordinates.push([endWaypoint.lat, endWaypoint.lng])
+            }
+            
+            // Create interactive segment with highlighting for selected leg
+            const isSelected = selectedLeg === legIndex
+            const segment = L.polyline(legCoordinates, {
+              color: isSelected ? '#4f46e5' : '#6366f1',
+              weight: isSelected ? 6 : 4,
+              opacity: isSelected ? 1 : 0.8,
+              smoothFactor: 1,
+              interactive: true
+            })
+            
+            // Add hover effects (only if not selected)
+            segment.on('mouseover', function(e) {
+              if (!isSelected) {
+                this.setStyle({
+                  color: '#4f46e5',
+                  weight: 6,
+                  opacity: 1
+                })
+              }
+            })
+            
+            segment.on('mouseout', function(e) {
+              if (!isSelected) {
+                this.setStyle({
+                  color: '#6366f1',
+                  weight: 4,
+                  opacity: 0.8
+                })
+              }
+            })
+            
+            // Add click handler for AI interaction
+            segment.on('click', function(e) {
+              const fromLocation = startWaypoint.location || `Waypoint ${legIndex + 1}`
+              const toLocation = endWaypoint.location || `Waypoint ${legIndex + 2}`
+              const distance = leg.distance ? Math.round(leg.distance / 1000) : 0
+              const duration = leg.duration ? Math.round(leg.duration / 60) : 0
+              
+              // Trigger AI chat about this segment
+              handleSegmentClick({
+                legIndex,
+                from: fromLocation,
+                to: toLocation,
+                distance: `${distance} km`,
+                duration: `${duration} min`,
+                coordinates: legCoordinates
+              })
+            })
+            
+            // Bind popup with segment info
+            const popupContent = `
+              <div style="font-size: 14px; line-height: 1.4;">
+                <strong>${startWaypoint.location || `Stop ${legIndex + 1}`}</strong><br/>
+                <span style="color: #666;">to</span><br/>
+                <strong>${endWaypoint.location || `Stop ${legIndex + 2}`}</strong><br/>
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+                  📏 ${Math.round(leg.distance / 1000)} km &nbsp;•&nbsp; 🕒 ${Math.round(leg.duration / 60)} min<br/>
+                  <em>Click to discuss this segment with AI</em>
+                </div>
+              </div>
+            `
+            segment.bindPopup(popupContent)
+            
+            segment.addTo(mapInstanceRef.current)
+            routeSegmentsRef.current.push(segment)
+          }
+        })
+      }
     }
-  }, [trip?.route])
+  }, [trip?.route, waypoints, selectedLeg])
 
   // Handle fullscreen state changes
   useEffect(() => {
@@ -237,10 +445,9 @@ const Map = () => {
   }
 
   const mapVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
+    hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      scale: 1,
       transition: {
         duration: 0.5,
         ease: "easeOut"
@@ -268,12 +475,29 @@ const Map = () => {
 
   return (
     <motion.div 
-      className={`${styles.mapContainer} glass-card`}
+      className={styles.mapContainer}
       variants={mapVariants}
       initial="hidden"
       animate="visible"
     >
       <div ref={mapRef} className={styles.map} />
+      
+      {/* POI Overlay for clickable road trip destinations */}
+      {showPOIs && mapInstanceRef.current && (
+        <POIOverlay map={mapInstanceRef.current} />
+      )}
+      
+      {/* Traffic Overlay */}
+      {showTraffic && mapInstanceRef.current && state.currentTrip?.waypoints && (
+        <TrafficOverlay 
+          waypoints={state.currentTrip.waypoints} 
+          visible={showTraffic}
+          map={mapInstanceRef.current} 
+        />
+      )}
+      
+      {/* Search Overlay for adding new stops */}
+      <SearchOverlay />
       
       <motion.div 
         className={styles.mapControls}
@@ -320,6 +544,30 @@ const Map = () => {
         </motion.button>
 
         <motion.button
+          className={`${styles.mapBtn} btn btn-secondary btn-icon ${showPOIs ? 'active' : ''}`}
+          onClick={() => setShowPOIs(!showPOIs)}
+          title={showPOIs ? "Hide points of interest" : "Show points of interest"}
+          variants={buttonVariants}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Star size={18} />
+        </motion.button>
+
+        <motion.button
+          className={`${styles.mapBtn} btn btn-secondary btn-icon ${showTraffic ? 'active' : ''}`}
+          onClick={() => setShowTraffic(!showTraffic)}
+          title={showTraffic ? "Hide traffic" : "Show traffic"}
+          variants={buttonVariants}
+          initial="rest"
+          animate="rest"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <span style={{ fontSize: '18px' }}>🚦</span>
+        </motion.button>
+
+        <motion.button
           className={`${styles.mapBtn} btn btn-secondary btn-icon`}
           onClick={handleFullscreen}
           title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
@@ -331,20 +579,12 @@ const Map = () => {
         </motion.button>
       </motion.div>
 
-      <motion.div 
-        className={styles.mapInfo}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className={styles.currentLayer}>
-          <Layers size={14} />
-          <span>{tileLayers[currentTileLayer].name}</span>
-        </div>
-      </motion.div>
 
     </motion.div>
   )
-}
+})
+
+// Display name for debugging
+Map.displayName = 'Map'
 
 export default Map

@@ -217,6 +217,30 @@
   background: var(--error-500);
 }
 
+.addStopContainer {
+  padding: 0 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.addStopContainer button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(59, 130, 246, 0.05);
+  border: 1.5px dashed var(--primary-400);
+  color: var(--primary-600);
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.addStopContainer button:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--primary-500);
+  transform: translateY(-1px);
+}
 
 .tripActions {
   display: flex;
@@ -238,6 +262,36 @@
   display: flex;
   gap: 0.5rem;
   justify-content: space-between;
+}
+
+.savedTripInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.tripNameDisplay {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.tripLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.tripName {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.875rem;
 }
 
 .exportActions button {

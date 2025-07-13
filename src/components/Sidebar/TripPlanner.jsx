@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   DndContext,
@@ -51,8 +51,8 @@ import { LocationInput } from './LocationInput'
 import { RichNotes } from './RichNotes'
 import styles from './TripPlanner.module.css'
 
-// Sortable waypoint item component
-const SortableWaypointItem = ({ waypoint, index, onUpdate, onRemove, getWaypointLabel, getWaypointIcon }) => {
+// Sortable waypoint item component - memoized for performance
+const SortableWaypointItem = memo(({ waypoint, index, onUpdate, onRemove, getWaypointLabel, getWaypointIcon }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const {
     attributes,
@@ -170,15 +170,24 @@ const SortableWaypointItem = ({ waypoint, index, onUpdate, onRemove, getWaypoint
       </div>
     </motion.div>
   )
-}
+})
 
-const TripPlanner = () => {
-  const { state, setCurrentTrip, addWaypoint, updateWaypoint: updateWaypointContext, removeWaypoint: removeWaypointContext } = useTrip()
+const TripPlanner = memo(() => {
+  const { state, setCurrentTrip, addWaypoint, updateWaypoint: updateWaypointContext, removeWaypoint: removeWaypointContext, saveTrip, newTrip } = useTrip()
   const [routeCalculating, setRouteCalculating] = useState(false)
   const [routeError, setRouteError] = useState(null)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [tripName, setTripName] = useState('')
 
   const trip = state.currentTrip
-  const waypoints = trip?.waypoints || []
+  const waypoints = useMemo(() => trip?.waypoints || [], [trip?.waypoints])
+  
+  // Check if current trip is saved
+  const isTripSaved = useMemo(() => {
+    if (!trip || !trip.id || trip.id === 'temp-trip') return false
+    const savedTrips = JSON.parse(localStorage.getItem('openroad-saved-trips') || '[]')
+    return savedTrips.some(t => t.id === trip.id)
+  }, [trip])
 
   // Initialize current trip and waypoints if empty
   useEffect(() => {
@@ -195,6 +204,21 @@ const TripPlanner = () => {
     }
   }, [trip, setCurrentTrip])
 
+  // Debounced route calculation - longer delay to prevent excessive API calls
+  useEffect(() => {
+    if (trip && waypoints.length > 0) {
+      const validWaypoints = waypoints.filter(wp => wp.lat && wp.lng)
+      if (validWaypoints.length >= 2 && !routeCalculating) {
+        console.log('📍 Waypoints changed, triggering debounced route calculation')
+        // Increased delay to 2 seconds to batch rapid changes better
+        const timer = setTimeout(() => {
+          calculateRouteForTrip()
+        }, 2000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [waypoints.length, waypoints.map(w => `${w.lat},${w.lng}`).join('|')]) // Dependencies on waypoint count and coordinates
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -202,7 +226,8 @@ const TripPlanner = () => {
     })
   )
 
-  const addWaypointToTrip = (locationData = null) => {
+  // Memoize addWaypointToTrip to prevent unnecessary re-renders
+  const addWaypointToTrip = useCallback((locationData = null) => {
     const newWaypoint = {
       id: `waypoint-${Date.now()}`,
       location: locationData?.name || '',
@@ -237,7 +262,7 @@ const TripPlanner = () => {
     }
     
     return newWaypoint.id // Return the ID so AI can reference it
-  }
+  }, [waypoints, trip, setCurrentTrip])
 
   const removeWaypointFromTrip = (id) => {
     if (waypoints) {
@@ -359,6 +384,13 @@ const TripPlanner = () => {
       // Filter waypoints with valid coordinates
       const validWaypoints = waypoints.filter(wp => wp.lat && wp.lng)
       
+      console.log('🗺️ Calculating route with waypoints:', validWaypoints.map(wp => ({
+        location: wp.location,
+        type: wp.type,
+        lat: wp.lat,
+        lng: wp.lng
+      })))
+      
       if (validWaypoints.length < 2) {
         setRouteError('Please add at least 2 locations with valid addresses')
         return
@@ -367,6 +399,12 @@ const TripPlanner = () => {
       const routeData = await calculateRoute(validWaypoints)
       
       if (routeData) {
+        console.log('✅ Route calculated successfully:', {
+          distance: routeData.distance,
+          duration: routeData.duration,
+          legs: routeData.legs?.length || 0
+        })
+        
         setCurrentTrip({
           ...trip,
           route: routeData,
@@ -439,6 +477,53 @@ const TripPlanner = () => {
     }
   }
 
+  const handleSaveTrip = () => {
+    if (!trip || !waypoints.some(wp => wp.location)) {
+      alert('Please add some waypoints before saving the trip.')
+      return
+    }
+    
+    if (isTripSaved) {
+      // Update existing trip without showing dialog
+      const tripToSave = {
+        ...trip,
+        updated: new Date().toISOString()
+      }
+      saveTrip(tripToSave)
+      alert(`Trip "${trip.name}" updated successfully!`)
+    } else {
+      // Show dialog for new trips
+      setTripName(trip.name || 'My Trip')
+      setShowSaveDialog(true)
+    }
+  }
+
+  const confirmSaveTrip = () => {
+    if (!tripName.trim()) {
+      alert('Please enter a trip name.')
+      return
+    }
+
+    const tripToSave = {
+      ...trip,
+      name: tripName.trim(),
+      updated: new Date().toISOString()
+    }
+
+    saveTrip(tripToSave)
+    setShowSaveDialog(false)
+    alert(`Trip "${tripName}" saved successfully!`)
+  }
+
+  const handleNewTrip = () => {
+    if (waypoints.some(wp => wp.location)) {
+      const confirmNew = confirm('This will clear your current trip. Are you sure?')
+      if (!confirmNew) return
+    }
+
+    newTrip('New Trip')
+  }
+
   const waypointVariants = {
     hidden: { opacity: 0, scale: 0.8, y: 20 },
     visible: { 
@@ -478,24 +563,6 @@ const TripPlanner = () => {
       initial="hidden"
       animate="visible"
     >
-      <div className={styles.tripHeader}>
-        <div className={styles.headerContent}>
-          <Route size={24} className={styles.headerIcon} />
-          <div>
-            <h2>Plan Your Trip</h2>
-            <p className={styles.headerSubtext}>Create amazing road trip itineraries</p>
-          </div>
-        </div>
-        <motion.button 
-          className="btn btn-primary btn-sm"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => console.log('New trip')}
-        >
-          <Sparkles size={16} />
-          <span>New Trip</span>
-        </motion.button>
-      </div>
 
       <DndContext
         sensors={sensors}
@@ -521,6 +588,22 @@ const TripPlanner = () => {
         </motion.div>
       </DndContext>
 
+      <motion.div 
+        className={styles.addStopContainer}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <motion.button
+          className="btn btn-outline w-full"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => addWaypointToTrip()}
+        >
+          <MapPin size={16} />
+          <span>Add Stop</span>
+        </motion.button>
+      </motion.div>
 
       <motion.div 
         className={styles.tripActions}
@@ -529,71 +612,40 @@ const TripPlanner = () => {
         transition={{ delay: 0.4 }}
       >
         <div className={styles.mainActions}>
-          <motion.button 
-            className="btn btn-primary"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={calculateRouteForTrip}
-            disabled={routeCalculating}
-          >
-            {routeCalculating ? <Loader2 size={18} className="animate-spin" /> : <Route size={18} />}
-            <span>{routeCalculating ? 'Calculating...' : 'Plan Route'}</span>
-          </motion.button>
+          {isTripSaved ? (
+            <div className={styles.savedTripInfo}>
+              <div className={styles.tripNameDisplay}>
+                <span className={styles.tripLabel}>Editing:</span>
+                <span className={styles.tripName}>{trip.name || 'Untitled Trip'}</span>
+              </div>
+              <motion.button 
+                className="btn btn-ghost btn-sm"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleSaveTrip}
+                title="Update saved trip"
+              >
+                <Save size={16} />
+              </motion.button>
+            </div>
+          ) : (
+            <motion.button 
+              className="btn btn-secondary w-full"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleSaveTrip}
+            >
+              <Save size={18} />
+              <span>Save Trip</span>
+            </motion.button>
+          )}
           
-          <motion.button 
-            className="btn btn-secondary"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Save size={18} />
-            <span>Save Trip</span>
-          </motion.button>
-        </div>
-        
-        <div className={styles.exportActions}>
-          <motion.button 
-            className="btn btn-ghost btn-sm"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleExportGPX}
-            title="Export as GPX"
-          >
-            <Download size={16} />
-            <span>GPX</span>
-          </motion.button>
-          
-          <motion.button 
-            className="btn btn-ghost btn-sm"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleExportKML}
-            title="Export as KML"
-          >
-            <Download size={16} />
-            <span>KML</span>
-          </motion.button>
-          
-          <motion.button 
-            className="btn btn-ghost btn-sm"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleExportCSV}
-            title="Export as CSV"
-          >
-            <FileText size={16} />
-            <span>CSV</span>
-          </motion.button>
-          
-          <motion.button 
-            className="btn btn-ghost btn-sm"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleOpenInGoogleMaps}
-            title="Open in Google Maps"
-          >
-            <ExternalLink size={16} />
-            <span>Maps</span>
-          </motion.button>
+          {routeCalculating && (
+            <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+              <Loader2 size={16} className="animate-spin" />
+              <span>Auto-calculating route...</span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -634,8 +686,58 @@ const TripPlanner = () => {
           )}
         </motion.div>
       )}
+
+      {/* Save Trip Dialog */}
+      {showSaveDialog && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={(e) => e.target === e.currentTarget && setShowSaveDialog(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
+          >
+            <h3 className="text-lg font-semibold mb-4">Save Trip</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trip Name
+              </label>
+              <input
+                type="text"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter a name for your trip"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowSaveDialog(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSaveTrip}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Save Trip
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   )
-}
+})
+
+// Display name for debugging
+TripPlanner.displayName = 'TripPlanner'
 
 export default TripPlanner

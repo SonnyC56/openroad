@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import './styles/accessibility.css';
 
 :root {
   /* Color Palette */
@@ -69,6 +70,59 @@
   --radius-2xl: 1.5rem;
 }
 
+/* Dark Theme */
+[data-theme="dark"] {
+  /* Color Palette */
+  --primary-50: #1a1a2e;
+  --primary-100: #16213e;
+  --primary-500: #818cf8;
+  --primary-600: #a78bfa;
+  --primary-700: #c4b5fd;
+  --primary-900: #e9d5ff;
+  
+  --secondary-50: #1a1a2e;
+  --secondary-500: #c084fc;
+  --secondary-600: #d8b4fe;
+  
+  --success-500: #34d399;
+  --warning-500: #fbbf24;
+  --error-500: #f87171;
+  
+  --gray-50: #111827;
+  --gray-100: #1f2937;
+  --gray-200: #374151;
+  --gray-300: #4b5563;
+  --gray-400: #6b7280;
+  --gray-500: #9ca3af;
+  --gray-600: #d1d5db;
+  --gray-700: #e5e7eb;
+  --gray-800: #f3f4f6;
+  --gray-900: #f9fafb;
+  --gray-850: #0f1620;
+  
+  /* Text Colors */
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-tertiary: #6b7280;
+  
+  /* Additional Colors */
+  --success-100: #064e3b;
+  --success-600: #10b981;
+  --warning-100: #451a03;
+  --warning-600: #f59e0b;
+  --error-100: #450a0a;
+  --error-600: #f87171;
+  --info-100: #1e3a8a;
+  --info-500: #60a5fa;
+  --info-600: #93c5fd;
+  
+  /* Glass backgrounds */
+  --glass-bg: rgba(30, 41, 59, 0.8);
+  --glass-border: rgba(99, 102, 241, 0.2);
+  --glass-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.15);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -93,6 +147,12 @@ body {
   padding: 0;
 }
 
+[data-theme="dark"] body {
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 20%, #24243e 40%, #0f0c29 60%, #302b63 80%, #24243e 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
 #root {
   height: 100vh;
   width: 100vw;
@@ -104,6 +164,9 @@ body {
   height: 100vh;
   width: 100vw;
   backdrop-filter: blur(20px);
+  /* Performance optimization: Reduce paint on scroll */
+  overflow: hidden;
+  contain: layout style paint;
 }
 
 .main {
@@ -114,6 +177,7 @@ body {
   overflow: hidden;
   position: relative;
   max-width: none;
+  margin-top: 90px;
 }
 
 .map-container {
@@ -122,9 +186,71 @@ body {
   height: 100%;
   width: 100%;
   min-width: 0; /* Allows flex item to shrink below content size */
+  overflow: hidden;
+  /* Ensure map container doesn't overlap header */
+  contain: layout;
 }
 
-/* Modern Button System */
+/* Performance optimization: Loading states for lazy components */
+.loading-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.95) 0%, 
+    rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.ai-loading-container {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+/* Enhanced loading spinner with micro-interactions */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #6366f1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite, spinPulse 2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes spinPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Modern Button System with Enhanced Micro-interactions */
 .btn {
   position: relative;
   display: inline-flex;
@@ -142,6 +268,13 @@ body {
   text-decoration: none;
   outline: none;
   overflow: hidden;
+  /* Enhanced focus for accessibility */
+  outline-offset: 2px;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--primary-500);
+  outline-offset: 2px;
 }
 
 .btn::before {
@@ -165,9 +298,16 @@ body {
 }
 
 .btn-primary:hover {
-  transform: translateY(-3px);
+  transform: translateY(-3px) scale(1.02);
   box-shadow: 0 15px 35px rgba(102, 126, 234, 0.6);
   background: linear-gradient(135deg, #5a67d8, #667eea);
+  animation: btnPulse 0.3s ease-out;
+}
+
+@keyframes btnPulse {
+  0% { box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
+  50% { box-shadow: 0 20px 40px rgba(102, 126, 234, 0.7); }
+  100% { box-shadow: 0 15px 35px rgba(102, 126, 234, 0.6); }
 }
 
 .btn-primary:active {
@@ -219,7 +359,6 @@ body {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-2xl);
   box-shadow: var(--glass-shadow);
   transition: all var(--transition-base);
 }
@@ -348,18 +487,53 @@ body {
   }
 }
 
-/* Responsive Design */
+/* Enhanced Responsive Design */
 @media (max-width: 768px) {
   .main {
     flex-direction: column;
+    margin-top: 60px;
+    height: calc(100vh - 60px);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .map-container {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(100vh - 60px);
+    z-index: 1;
   }
   
   .btn {
     padding: 0.625rem 1.25rem;
     font-size: 0.8rem;
+    /* Larger touch targets for mobile */
+    min-height: 44px;
+    min-width: 44px;
   }
   
   .glass-card {
     border-radius: var(--radius-xl);
+  }
+  
+  /* Improved mobile interactions */
+  .btn:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .main {
+    height: calc(100vh - 90px);
+  }
+  
+  .btn {
+    padding: 0.7rem 1.4rem;
+    font-size: 0.85rem;
   }
 }

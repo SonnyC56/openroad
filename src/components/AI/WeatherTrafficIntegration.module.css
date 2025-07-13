@@ -1,0 +1,106 @@
+.integration {
+  margin: 1rem 0;
+}
+
+.recommendations {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.header svg {
+  color: var(--warning-500);
+}
+
+.recommendation {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.5rem;
+  border: 1px solid transparent;
+}
+
+.recommendation.high {
+  background: var(--error-100);
+  border-color: var(--error-200);
+}
+
+.recommendation.medium {
+  background: var(--warning-100);
+  border-color: var(--warning-200);
+}
+
+.recommendation.info {
+  background: var(--info-100);
+  border-color: var(--info-200);
+}
+
+.recIcon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.recommendation.high .recIcon {
+  color: var(--error-600);
+}
+
+.recommendation.medium .recIcon {
+  color: var(--warning-600);
+}
+
+.recommendation.info .recIcon {
+  color: var(--info-600);
+}
+
+.recContent {
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+.recMessage {
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.recSuggestion {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.summary {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.label {
+  color: var(--text-secondary);
+}
+
+.value {
+  font-weight: 600;
+  color: var(--primary-600);
+}
